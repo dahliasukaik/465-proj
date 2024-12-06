@@ -21,13 +21,11 @@ app.get('/health',(req,res)=>{
 });
 
 // ADD TRANSACTION
-app.post('/transaction', (req,res)=>{
+app.post('/inventory', (req,res)=>{
     var response = "";
     try{
         console.log(req.body);
-        console.log(req.body.amount);
-        console.log(req.body.desc);
-        var success = transactionService.addTransaction(req.body.amount,req.body.desc);
+        var success = transactionService.addTransaction(req.body);
         if (success = 200) res.json({ message: 'added transaction successfully'});
     }catch (err){
         res.json({ message: 'something went wrong', error : err.message});
@@ -35,17 +33,28 @@ app.post('/transaction', (req,res)=>{
 });
 
 // GET ALL TRANSACTIONS
-app.get('/transaction',(req,res)=>{
+app.get('/inventory',(req,res)=>{
     try{
         var transactionList = [];
        transactionService.getAllTransactions(function (results) {
             console.log("we are in the call back:");
             for (const row of results) {
-                transactionList.push({ "id": row.id, "amount": row.amount, "description": row.description });
+                transactionList.push({
+                    "id": row.id,
+                    "name": row.name,
+                    "posterImg": row.posterImg,
+                    "coverImg": row.coverImg,
+                    "description": row.description,
+                    "rating": row.rating,
+                    "year": row.year,
+                    "tagLine": row.tagLine,
+                    "minutes": row.minutes,
+                    "genres": row.genres,
+                });
             }
             console.log(transactionList);
             res.statusCode = 200;
-            res.json({"result":transactionList});
+            res.json(transactionList);
         });
     }catch (err){
         res.json({message:"could not get all transactions",error: err.message});
@@ -53,7 +62,7 @@ app.get('/transaction',(req,res)=>{
 });
 
 //DELETE ALL TRANSACTIONS
-app.delete('/transaction',(req,res)=>{
+app.delete('/inventory',(req,res)=>{
     try{
         transactionService.deleteAllTransactions(function(result){
             res.statusCode = 200;
@@ -65,7 +74,7 @@ app.delete('/transaction',(req,res)=>{
 });
 
 //DELETE ONE TRANSACTION
-app.delete('/transaction/id', (req,res)=>{
+app.delete('/inventory/id', (req,res)=>{
     try{
         //probably need to do some kind of parameter checking
         transactionService.deleteTransactionById(req.body.id, function(result){
@@ -78,15 +87,34 @@ app.delete('/transaction/id', (req,res)=>{
 });
 
 //GET SINGLE TRANSACTION
-app.get('/transaction/id',(req,res)=>{
+app.get('/inventory/id',(req,res)=>{
     //also probably do some kind of parameter checking here
     try{
         transactionService.findTransactionById(req.body.id,function(result){
             res.statusCode = 200;
             var id = result[0].id;
-            var amt = result[0].amount;
-            var desc= result[0].desc;
-            res.json({"id":id,"amount":amt,"desc":desc});
+            var name = result[0].name;
+            var posterImg= result[0].posterImg;
+            var coverImg = result[0].coverImg;
+            var description = result[0].description;
+            var rating = result[0].rating;
+            var year = result[0].year;
+            var tagLine= result[0].tagLine;
+            var minutes= result[0].minutes;
+            var genres= result[0].genres;
+
+            res.json({
+                "id": id,
+                "name": name,
+                "posterImg": posterImg,
+                "coverImg": coverImg,
+                "description": description,
+                "rating": rating,
+                "year": year,
+                "tagLine": tagLine,
+                "minutes": minutes,
+                "genres": genres,
+            });
         });
 
     }catch(err){
