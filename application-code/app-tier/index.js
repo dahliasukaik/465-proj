@@ -2,126 +2,128 @@ const transactionService = require('./TransactionService');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const os = require('os');
-const fetch = require('node-fetch');
-
 const app = express();
 const port = 4000;
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-app.use(cors());
 
-// ROUTES FOR OUR API
-// =======================================================
+// Middleware - Put this before your route definitions
+app.use(cors()); // Allows cross-origin requests, useful if frontend and backend are on different ports
+app.use(bodyParser.urlencoded({ extended: true })); // Parses URL-encoded data
+app.use(bodyParser.json()); // Parses JSON request body
 
-//Health Checking
-app.get('/health',(req,res)=>{
-    res.json("This is the health check");
+
+// Enable CORS for all routes
+app.use(cors({
+  origin: 'http://localhost:3000', // Your React app's URL
+  methods: ['GET', 'POST', 'DELETE'], // Allowed methods
+  allowedHeaders: ['Content-Type'] // Allowed headers
+}));
+
+// Health Check Route
+app.get('/health', (req, res) => {
+    res.json({ message: "Health check successful!" });
 });
 
-// ADD TRANSACTION
-app.post('/inventory', (req,res)=>{
-    var response = "";
-    try{
-        console.log(req.body);
-        var success = transactionService.addTransaction(req.body);
-        if (success = 200) res.json({ message: 'added transaction successfully'});
-    }catch (err){
-        res.json({ message: 'something went wrong', error : err.message});
+app.post('/transaction', async (req, res) => {
+    console.log('Received POST request to /transaction');
+    try {
+        const { amount, desc } = req.body;
+        console.log(`Amount: ${amount}, Description: ${desc}`);
+
+        // Ensure 'amount' is treated as a number
+        const parsedAmount = parseFloat(amount);
+        if (isNaN(parsedAmount)) {
+            return res.status(400).json({ message: 'Invalid amount, must be a number' });
+        }
+
+        // Call the addTransaction service
+        const success = await transactionService.addTransaction(parsedAmount, desc);
+
+        // Log the success value
+        console.log('Transaction add success status:', success);
+
+        if (success === 200) {
+            res.status(200).json({ message: 'Transaction added successfully' });
+        } else {
+            res.status(400).json({ message: 'Failed to add transaction' });
+        }
+    } catch (err) {
+        console.error('Error:', err);
+        res.status(500).json({ message: 'Something went wrong', error: err.message });
     }
 });
 
-// GET ALL TRANSACTIONS
-app.get('/inventory',(req,res)=>{
-    try{
-        var transactionList = [];
-       transactionService.getAllTransactions(function (results) {
-            console.log("we are in the call back:");
-            for (const row of results) {
-                transactionList.push({
-                    "id": row.id,
-                    "name": row.name,
-                    "posterImg": row.posterImg,
-                    "coverImg": row.coverImg,
-                    "description": row.description,
-                    "rating": row.rating,
-                    "year": row.year,
-                    "tagLine": row.tagLine,
-                    "minutes": row.minutes,
-                    "genres": row.genres,
-                });
-            }
-            console.log(transactionList);
-            res.statusCode = 200;
-            res.json(transactionList);
-        });
-    }catch (err){
-        res.json({message:"could not get all transactions",error: err.message});
+
+
+app.get('/transaction', async (req, res) => {
+    try {
+        console.log('Fetching all transactions...');
+        const transactionList = await transactionService.getAllTransactions();
+        console.log('Transactions retrieved:', transactionList);
+
+        if (!Array.isArray(transactionList)) {
+            return res.status(500).json({ message: 'Invalid data received', error: 'Data is not an array' });
+        }
+
+        const result = transactionList.map(row => ({
+            id: row.id,
+            amount: row.amount,
+            description: row.description,
+        }));
+
+        res.status(200).json({ result });
+    } catch (err) {
+        console.error('Error:', err);
+        res.status(500).json({ message: 'Could not retrieve transactions', error: err.message });
     }
 });
 
-//DELETE ALL TRANSACTIONS
-app.delete('/inventory',(req,res)=>{
-    try{
-        transactionService.deleteAllTransactions(function(result){
-            res.statusCode = 200;
-            res.json({message:"delete function execution finished."})
-        })
-    }catch (err){
-        res.json({message: "Deleting all transactions may have failed.", error:err.message});
+
+
+// Delete All Transactions
+app.delete('/transaction', async (req, res) => {
+    try {
+        await transactionService.deleteAllTransactions();
+        res.status(200).json({ message: 'All transactions deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to delete all transactions', error: err.message });
     }
 });
 
-//DELETE ONE TRANSACTION
-app.delete('/inventory/id', (req,res)=>{
-    try{
-        //probably need to do some kind of parameter checking
-        transactionService.deleteTransactionById(req.body.id, function(result){
-            res.statusCode = 200;
-            res.json({message: `transaction with id ${req.body.id} seemingly deleted`});
-        })
-    } catch (err){
-        res.json({message:"error deleting transaction", error: err.message});
+// Delete One Transaction
+app.delete('/transaction/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await transactionService.deleteTransactionById(id);
+
+        if (result.affectedRows > 0) {
+            res.status(200).json({ message: `Transaction with id ${id} deleted successfully` });
+        } else {
+            res.status(404).json({ message: `Transaction with id ${id} not found` });
+        }
+    } catch (err) {
+        res.status(500).json({ message: 'Error deleting transaction', error: err.message });
     }
 });
 
-//GET SINGLE TRANSACTION
-app.get('/inventory/id',(req,res)=>{
-    //also probably do some kind of parameter checking here
-    try{
-        transactionService.findTransactionById(req.body.id,function(result){
-            res.statusCode = 200;
-            var id = result[0].id;
-            var name = result[0].name;
-            var posterImg= result[0].posterImg;
-            var coverImg = result[0].coverImg;
-            var description = result[0].description;
-            var rating = result[0].rating;
-            var year = result[0].year;
-            var tagLine= result[0].tagLine;
-            var minutes= result[0].minutes;
-            var genres= result[0].genres;
+// Get Single Transaction
+app.get('/transaction/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await transactionService.findTransactionById(id);
 
-            res.json({
-                "id": id,
-                "name": name,
-                "posterImg": posterImg,
-                "coverImg": coverImg,
-                "description": description,
-                "rating": rating,
-                "year": year,
-                "tagLine": tagLine,
-                "minutes": minutes,
-                "genres": genres,
-            });
-        });
-
-    }catch(err){
-        res.json({message:"error retrieving transaction", error: err.message});
+        if (result && result.length > 0) {
+            const { id, amount, description } = result[0];
+            res.status(200).json({ id, amount, description });
+        } else {
+            res.status(404).json({ message: `Transaction with id ${id} not found` });
+        }
+    } catch (err) {
+        res.status(500).json({ message: 'Error retrieving transaction', error: err.message });
     }
 });
 
-  app.listen(port, () => {
-    console.log(`AB3 backend app listening at http://localhost:${port}`)
-  })
+// Start server
+app.listen(port, () => {
+    console.log(`AB3 backend app listening at http://localhost:${port}`);
+});
